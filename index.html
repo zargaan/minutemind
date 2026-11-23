@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="MinuteMind — meeting and lecture notes that write themselves. Hybrid AI via Firebase AI Logic: on-device Gemini Nano 4 when available, cloud Gemini fallback when not."
+    />
+    <title>MinuteMind — notes that write themselves</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%232563eb'/%3E%3Ctext x='50' y='66' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'%3EM%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">M</span>
+        <div>
+          <h1>MinuteMind</h1>
+          <p class="tagline">Meeting notes that write themselves — privately when possible.</p>
+        </div>
+      </div>
+      <div class="status" aria-label="AI status">
+        <span class="chip" id="chip-config" title="Firebase configuration status">Firebase: checking…</span>
+        <span class="chip" id="chip-device" title="On-device model (Gemini Nano 4) availability">On-device: checking…</span>
+        <span class="chip" id="chip-route" title="How the next request will be routed">Route: —</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel input-panel" aria-label="Your notes">
+        <h2>1 · Paste your notes</h2>
+        <p class="hint">
+          Paste a meeting transcript, lecture notes, or a call summary. Short notes run
+          on-device (Gemini Nano 4, private &amp; offline); long ones go to the cloud.
+        </p>
+
+        <label class="field-label" for="title">Title</label>
+        <input id="title" type="text" value="Weekly product standup — Nov 24" maxlength="120" />
+
+        <label class="field-label" for="transcript">Notes / transcript</label>
+        <textarea
+          id="transcript"
+          rows="12"
+          placeholder="Paste your transcript here… e.g. Maya: the checkout freeze is Friday. Dan will deploy the payment form tomorrow…"
+        ></textarea>
+        <div class="meta-row">
+          <span id="char-count">0 characters</span>
+          <span id="route-preview" class="route-preview"></span>
+        </div>
+
+        <div class="button-row">
+          <button id="btn-sample-standup" type="button" class="btn btn-ghost">Load short sample</button>
+          <button id="btn-sample-client" type="button" class="btn btn-ghost">Load long sample</button>
+          <label class="btn btn-ghost file-btn" for="file-input">Upload .txt / .md</label>
+          <input id="file-input" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+        </div>
+
+        <fieldset class="privacy">
+          <legend>2 · Where should the AI run?</legend>
+          <label>
+            <input type="radio" name="privacy" value="hybrid" checked />
+            <strong>Hybrid (recommended)</strong> — on-device Nano first, cloud fallback
+          </label>
+          <label>
+            <input type="radio" name="privacy" value="private" />
+            <strong>Private only</strong> — on-device Nano, never leaves this device
+          </label>
+          <label>
+            <input type="radio" name="privacy" value="cloud" />
+            <strong>Cloud only</strong> — full Gemini model, best for long notes
+          </label>
+        </fieldset>
+
+        <button id="btn-generate" type="button" class="btn btn-primary btn-big">
+          Generate minutes
+        </button>
+        <p id="progress" class="progress" role="status" aria-live="polite"></p>
+        <p id="engine-note" class="engine-note"></p>
+      </section>
+
+      <section class="panel results-panel" aria-label="Minutes">
+        <h2>3 · Your minutes</h2>
+        <div id="empty-state" class="empty-state">
+          <p><strong>Nothing here yet.</strong></p>
+          <p>
+            Load a sample on the left, or paste your own notes, then press
+            <strong>Generate minutes</strong>. You will get a summary, the decisions,
+            a checkable action list, and a follow-up email draft.
+          </p>
+        </div>
+
+        <div id="results" hidden>
+          <div class="result-head">
+            <h3 id="result-title"></h3>
+            <span id="result-badge" class="badge"></span>
+          </div>
+          <p id="result-meta" class="result-meta"></p>
+
+          <h4>Summary</h4>
+          <p id="result-summary"></p>
+
+          <h4>Decisions</h4>
+          <ul id="result-decisions" class="clean-list"></ul>
+
+          <h4>Action items <span class="hint-inline">(tick them off as you go)</span></h4>
+          <ul id="result-actions" class="action-list"></ul>
+
+          <h4>Follow-up email draft</h4>
+          <pre id="result-email" class="email-draft"></pre>
+
+          <div class="button-row">
+            <button id="btn-copy-email" type="button" class="btn btn-ghost">Copy email</button>
+            <button id="btn-export" type="button" class="btn btn-ghost">Export .md</button>
+            <button id="btn-save" type="button" class="btn btn-ghost">Save to library</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel library-panel" aria-label="Saved minutes">
+        <h2>Library <span class="hint-inline">— saved on this device only</span></h2>
+        <input
+          id="library-search"
+          type="search"
+          placeholder="Search saved minutes…"
+          aria-label="Search saved minutes"
+        />
+        <ul id="library-list" class="library-list"></ul>
+        <p id="library-empty" class="hint">No saved minutes yet. Generate some, then press “Save to library”.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <h2>How the hybrid AI works</h2>
+      <p>
+        Every AI call in MinuteMind goes through
+        <strong>Firebase AI Logic</strong> — no other model API is called.
+        The app creates one hybrid model with
+        <code>getGenerativeModel(ai, { mode: InferenceMode.PREFER_ON_DEVICE, inCloudParams: { model: 'gemini-2.5-flash', generationConfig: { responseMimeType: 'application/json', responseSchema } }, onDeviceParams: { promptOptions: { responseConstraint: schema } } })</code>,
+        calls <code>model.initializeDeviceModel()</code> on your click, then
+        <code>model.generateContent()</code> — and reads
+        <code>result.response.inferenceSource</code> (<code>ON_DEVICE</code> or
+        <code>IN_CLOUD</code>) to show which path actually ran.
+        Short notes run on <strong>Gemini Nano 4 on-device</strong> (private, free, works offline);
+        long notes fall back to <strong>Gemini 2.5 Flash in the cloud</strong>. Structured JSON
+        output keeps the summary, decisions, action items, and email draft in the same shape
+        whichever path ran. Firebase App Check protects the API key; debug tokens are used
+        for local development.
+      </p>
+      <p class="fineprint">
+        MinuteMind is open source (MIT). Your notes are stored only in this browser's
+        local storage unless you choose the cloud AI path, in which case the transcript
+        is sent to Google's Gemini API via Firebase AI Logic — see the privacy mode above.
+      </p>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

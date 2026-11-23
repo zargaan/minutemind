@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "firebase": "^13.4.0"
+  },
+  "description": "MinuteMind — meeting & lecture notes that write themselves. Hybrid AI via Firebase AI Logic: on-device Gemini Nano 4 when available, cloud Gemini fallback when not.",
+  "devDependencies": {
+    "vite": "^8.3.8",
+    "vite-node": "^6.0.0"
+  },
+  "license": "MIT",
+  "name": "minutemind",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test": "node --test tests/routing.test.mjs tests/fallback.test.mjs",
+    "test:ai": "vite-node scripts/ai-smoke.mjs"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
